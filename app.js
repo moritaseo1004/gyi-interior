@@ -420,6 +420,14 @@ function monthLabel(date) {
   return `${date.getFullYear()}년 ${String(date.getMonth() + 1).padStart(2, "0")}월`;
 }
 
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date, months) {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
 function isDateInRange(date, start, end) {
   const time = date.getTime();
   return time >= start.getTime() && time <= end.getTime();
@@ -511,23 +519,17 @@ function renderSchedule() {
       end: event.end || event.start,
     }));
 
-  if (!events.length) {
-    els.scheduleSummary.textContent = "일정 미정";
-    els.scheduleList.innerHTML = `
-      <div class="empty-state">
-        <div>
-          <strong>아직 등록된 일정이 없어요.</strong><br />
-          <span>공정 상세에서 시작일자와 종료일자를 입력하면 여기에 표시됩니다.</span>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  const minDate = new Date(Math.min(...events.map((event) => event.start.getTime())));
-  const maxDate = new Date(Math.max(...events.map((event) => event.end.getTime())));
-  const firstMonth = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-  const lastMonth = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+  const today = new Date();
+  const defaultFirstMonth = startOfMonth(today);
+  const defaultLastMonth = addMonths(defaultFirstMonth, 2);
+  const minDate = events.length
+    ? new Date(Math.min(...events.map((event) => event.start.getTime())))
+    : today;
+  const maxDate = events.length
+    ? new Date(Math.max(...events.map((event) => event.end.getTime())))
+    : addMonths(today, 2);
+  const firstMonth = new Date(Math.min(defaultFirstMonth.getTime(), startOfMonth(minDate).getTime()));
+  const lastMonth = new Date(Math.max(defaultLastMonth.getTime(), startOfMonth(maxDate).getTime()));
   const months = [];
 
   for (
@@ -538,7 +540,9 @@ function renderSchedule() {
     months.push(new Date(cursor));
   }
 
-  els.scheduleSummary.textContent = `${formatDateObject(minDate)} - ${formatDateObject(maxDate)}`;
+  els.scheduleSummary.textContent = events.length
+    ? `${formatDateObject(minDate)} - ${formatDateObject(maxDate)}`
+    : "일정 미정";
   els.scheduleList.innerHTML = months
     .map((month) => {
       const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
