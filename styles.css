@@ -1024,11 +1024,16 @@ dialog::backdrop {
   .nav-scroll {
     display: flex;
     gap: 8px;
+    align-items: stretch;
     margin-inline: -12px;
     padding: 0 12px 4px;
     overflow-x: auto;
+    overflow-y: hidden;
     overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
   }
 
   .nav-scroll::-webkit-scrollbar {
@@ -1041,6 +1046,7 @@ dialog::backdrop {
     min-height: 56px;
     padding: 8px;
     font-size: 16px;
+    scroll-snap-align: start;
   }
 
   .dashboard-nav.active {
@@ -1075,13 +1081,17 @@ dialog::backdrop {
   }
 
   .process-list {
-    display: contents;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    overflow: visible;
   }
 
   .process-item {
     flex: 0 0 132px;
     min-height: 56px;
     padding: 8px;
+    scroll-snap-align: start;
   }
 
   .process-item strong {
