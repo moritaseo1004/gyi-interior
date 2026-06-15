@@ -405,6 +405,83 @@ button:focus-visible {
   font-size: 20px;
 }
 
+.dashboard-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.focus-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 260px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.focus-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.focus-card h4 {
+  margin: 4px 0 0;
+  font-size: 16px;
+}
+
+.focus-card header strong {
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+.focus-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mini-action {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mini-action:hover {
+  border-color: #3f3f46;
+  background: #18181b;
+}
+
+.mini-action small,
+.quiet-line {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quiet-line {
+  display: block;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
 .estimate-table {
   display: grid;
   gap: 8px;
@@ -1276,6 +1353,15 @@ dialog::backdrop {
 
   .dashboard-stats strong {
     font-size: 24px;
+  }
+
+  .dashboard-focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-card {
+    min-height: 0;
+    padding: 12px;
   }
 
   .estimate-table {

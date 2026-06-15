@@ -486,6 +486,10 @@ function processNamesForQuote(quote) {
   return quoteProcessIds(quote).map(processName);
 }
 
+function viewButton(label, target, extra = "") {
+  return `<button class="mini-action" type="button" data-dashboard-view="${target}">${escapeHtml(label)}${extra ? `<small>${escapeHtml(extra)}</small>` : ""}</button>`;
+}
+
 function formatDate(value) {
   if (!value) return "";
   const [, month, day] = value.split("-");
@@ -593,12 +597,30 @@ function renderSummary() {
 }
 
 function renderDashboard() {
-  const rows = state.processes.map((process, index) => {
+  const processRows = state.processes.map((process, index) => {
     const quote = dashboardQuoteFor(process);
     const selectedQuote = selectedQuoteFor(process);
     return { process, quote, selectedQuote, index };
   });
-  const selectedRows = rows.filter((row) => row.selectedQuote);
+  const selectedRows = processRows.filter((row) => row.selectedQuote);
+  const unlinkedRows = processRows.filter((row) => !row.quote);
+  const unscheduledRows = processRows.filter((row) => !row.process.startDate || !row.process.endDate);
+  const pendingQuotes = (state.quotes || []).filter((quote) => quote.status !== "선정" && quote.status !== "탈락");
+  const incompletePurchases = (state.purchases || []).filter((item) => item.status !== "구매 완료");
+  const today = new Date();
+  const weekEnd = addDays(today, 7);
+  const upcomingRows = processRows
+    .map((row) => ({
+      ...row,
+      start: parseDate(row.process.startDate),
+      end: parseDate(row.process.endDate || row.process.startDate),
+    }))
+    .filter((row) => {
+      if (!row.start && !row.end) return false;
+      const start = row.start || row.end;
+      const end = row.end || row.start;
+      return start <= weekEnd && end >= today;
+    });
   const quoteTotal = selectedQuotes().reduce((sum, quote) => sum + totalWithVat(quote, "quote"), 0);
   const quoteDeductibleVat = selectedQuotes().reduce((sum, quote) => sum + deductibleVat(quote, "quote"), 0);
   const purchaseDeductibleVat = (state.purchases || []).reduce(
@@ -614,33 +636,110 @@ function renderDashboard() {
   els.deductibleVatTotal.textContent = numericMoney(quoteDeductibleVat + purchaseDeductibleVat);
 
   els.estimateTable.innerHTML = `
-    <div class="estimate-header" aria-hidden="true">
-      <span>공정</span>
-      <span>연결 견적</span>
-      <span>일정</span>
-      <span>견적가</span>
-    </div>
-    ${rows
-      .map(({ process, quote, selectedQuote, index }) => {
-      const hasQuote = Boolean(quote);
-      const isSelected = Boolean(selectedQuote);
-      const linkedCount = quoteProcessIds(quote).length;
-      return `
-        <button class="estimate-row ${isSelected ? "selected" : ""}" type="button" data-process-id="${process.id}">
-          <span class="estimate-process">
-            <small>${String(index + 1).padStart(2, "0")}</small>
-            ${escapeHtml(process.name)}
-          </span>
-          <span class="estimate-vendor">${escapeHtml(quote ? `${quote.name || "업체 미입력"} · ${quote.title || "견적"} · ${quote.status || "후보"}` : "견적 미연결")}</span>
-          <span class="estimate-date">${escapeHtml(dateRange(process))}</span>
-          <strong class="estimate-amount">
-            <span>${escapeHtml(hasQuote ? numericMoney(totalWithVat(quote, "quote")) : "-")}</span>
-            <small>${escapeHtml(hasQuote ? `${vatLabel(quote, "quote")}${linkedCount > 1 ? " · 묶음" : ""}` : "VAT 미정")}</small>
-          </strong>
-        </button>
-      `;
-    })
-    .join("")}
+    <section class="focus-card">
+      <header>
+        <div>
+          <p class="eyebrow">견적 연결</p>
+          <h4>견적 없는 공정</h4>
+        </div>
+        <strong>${unlinkedRows.length}건</strong>
+      </header>
+      <div class="focus-list">
+        ${
+          unlinkedRows.length
+            ? unlinkedRows
+                .slice(0, 5)
+                .map(({ process, index }) => viewButton(`${String(index + 1).padStart(2, "0")} ${process.name}`, `process:${process.id}`, "공정 열기"))
+                .join("")
+            : `<span class="quiet-line">모든 공정에 견적이 연결됐어요.</span>`
+        }
+      </div>
+      ${viewButton("견적 화면으로", "quote")}
+    </section>
+
+    <section class="focus-card">
+      <header>
+        <div>
+          <p class="eyebrow">선정 대기</p>
+          <h4>아직 결정 안 된 견적</h4>
+        </div>
+        <strong>${pendingQuotes.length}건</strong>
+      </header>
+      <div class="focus-list">
+        ${
+          pendingQuotes.length
+            ? pendingQuotes
+                .slice(0, 5)
+                .map((quote) => viewButton(quote.title || quote.name || "견적", "quote", `${quote.status || "후보"} · ${numericMoney(totalWithVat(quote, "quote"))}`))
+                .join("")
+            : `<span class="quiet-line">선정 대기 중인 견적이 없어요.</span>`
+        }
+      </div>
+      ${viewButton("견적 정리하기", "quote")}
+    </section>
+
+    <section class="focus-card">
+      <header>
+        <div>
+          <p class="eyebrow">일정</p>
+          <h4>일정 미입력 공정</h4>
+        </div>
+        <strong>${unscheduledRows.length}건</strong>
+      </header>
+      <div class="focus-list">
+        ${
+          unscheduledRows.length
+            ? unscheduledRows
+                .slice(0, 5)
+                .map(({ process, index }) => viewButton(`${String(index + 1).padStart(2, "0")} ${process.name}`, `process:${process.id}`, "일정 입력"))
+                .join("")
+            : `<span class="quiet-line">모든 공정 일정이 입력됐어요.</span>`
+        }
+      </div>
+      ${viewButton("캘린더 보기", "schedule")}
+    </section>
+
+    <section class="focus-card">
+      <header>
+        <div>
+          <p class="eyebrow">이번 주</p>
+          <h4>다가오는 공정</h4>
+        </div>
+        <strong>${upcomingRows.length}건</strong>
+      </header>
+      <div class="focus-list">
+        ${
+          upcomingRows.length
+            ? upcomingRows
+                .slice(0, 5)
+                .map(({ process, index }) => viewButton(`${String(index + 1).padStart(2, "0")} ${process.name}`, `process:${process.id}`, dateRange(process)))
+                .join("")
+            : `<span class="quiet-line">7일 안에 잡힌 공정이 없어요.</span>`
+        }
+      </div>
+      ${viewButton("일정 확인하기", "schedule")}
+    </section>
+
+    <section class="focus-card">
+      <header>
+        <div>
+          <p class="eyebrow">구매</p>
+          <h4>미완료 구매 품목</h4>
+        </div>
+        <strong>${incompletePurchases.length}건</strong>
+      </header>
+      <div class="focus-list">
+        ${
+          incompletePurchases.length
+            ? incompletePurchases
+                .slice(0, 5)
+                .map((item) => viewButton(item.name || "구매 품목", "purchase", `${item.status || "구매 예정"} · ${numericMoney(totalWithVat(item, "price"))}`))
+                .join("")
+            : `<span class="quiet-line">미완료 구매 품목이 없어요.</span>`
+        }
+      </div>
+      ${viewButton("구매 목록으로", "purchase")}
+    </section>
   `;
 }
 
@@ -1083,6 +1182,21 @@ function wireEvents() {
   });
 
   els.estimateTable.addEventListener("click", (event) => {
+    const viewButton = event.target.closest("[data-dashboard-view]");
+    if (viewButton) {
+      const target = viewButton.dataset.dashboardView;
+      if (target.startsWith("process:")) {
+        state.activeProcessId = target.replace("process:", "");
+        currentView = "process";
+        saveState();
+      } else {
+        currentView = target;
+      }
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     const button = event.target.closest("[data-process-id]");
     if (!button) return;
     state.activeProcessId = button.dataset.processId;
