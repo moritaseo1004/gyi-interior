@@ -759,6 +759,33 @@ button:focus-visible {
   font-size: 16px;
 }
 
+.attachment-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paste-zone {
+  display: grid;
+  place-items: center;
+  min-height: 72px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--surface-strong);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.paste-zone:focus {
+  outline: none;
+  border-color: #52525b;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
 .estimate-process {
   display: flex;
   gap: 8px;

@@ -7,6 +7,7 @@ const supabaseClient =
     : null;
 
 let remoteSaveTimer = null;
+let pendingPastedQuoteFiles = [];
 
 const PROCESS_STATUSES = [
   "알아보는 중",
@@ -212,6 +213,8 @@ const els = {
   vendorScope: document.querySelector("#vendorScope"),
   vendorMemo: document.querySelector("#vendorMemo"),
   vendorAttachmentInput: document.querySelector("#vendorAttachmentInput"),
+  vendorPasteZone: document.querySelector("#vendorPasteZone"),
+  vendorPendingAttachmentList: document.querySelector("#vendorPendingAttachmentList"),
   vendorAttachmentList: document.querySelector("#vendorAttachmentList"),
   deleteVendorBtn: document.querySelector("#deleteVendorBtn"),
   purchaseDialog: document.querySelector("#purchaseDialog"),
@@ -1197,6 +1200,30 @@ function renderAttachmentList(attachments = []) {
     .join("");
 }
 
+function renderPendingAttachmentList() {
+  if (!pendingPastedQuoteFiles.length) {
+    els.vendorPendingAttachmentList.innerHTML = "";
+    return;
+  }
+
+  els.vendorPendingAttachmentList.innerHTML = pendingPastedQuoteFiles
+    .map(
+      (file, index) => `
+        <div class="attachment-item" data-pending-attachment-index="${index}">
+          <span>${escapeHtml(file.name)}</span>
+          <button class="icon-button" type="button" title="붙여넣은 이미지 삭제">×</button>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function pastedImageFileName(file) {
+  const extension = file.type === "image/jpeg" ? "jpg" : "png";
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `pasted-estimate-${timestamp}.${extension}`;
+}
+
 function openVendorDialog(quote = null, defaultProcessIds = [activeProcess().id]) {
   const processIds = quote ? quoteProcessIds(quote) : defaultProcessIds;
   els.vendorDialogTitle.textContent = quote ? "견적 수정" : "견적 추가";
@@ -1211,6 +1238,8 @@ function openVendorDialog(quote = null, defaultProcessIds = [activeProcess().id]
   els.vendorScope.value = quote?.scope || "";
   els.vendorMemo.value = quote?.memo || "";
   els.vendorAttachmentInput.value = "";
+  pendingPastedQuoteFiles = [];
+  renderPendingAttachmentList();
   renderAttachmentList(quoteAttachments(quote));
   renderProcessChecks(processIds.length ? processIds : [activeProcess().id]);
   els.deleteVendorBtn.style.display = quote ? "inline-flex" : "none";
@@ -1449,6 +1478,34 @@ function wireEvents() {
     render();
   });
 
+  els.vendorPendingAttachmentList.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const item = button.closest("[data-pending-attachment-index]");
+    const index = Number(item?.dataset.pendingAttachmentIndex);
+    if (Number.isNaN(index)) return;
+    pendingPastedQuoteFiles.splice(index, 1);
+    renderPendingAttachmentList();
+  });
+
+  els.vendorPasteZone.addEventListener("paste", (event) => {
+    const items = [...(event.clipboardData?.items || [])];
+    const imageFiles = items
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter(Boolean)
+      .map((file) => new File([file], pastedImageFileName(file), { type: file.type || "image/png" }));
+
+    if (!imageFiles.length) return;
+    event.preventDefault();
+    pendingPastedQuoteFiles.push(...imageFiles);
+    renderPendingAttachmentList();
+  });
+
+  els.vendorPasteZone.addEventListener("click", () => {
+    els.vendorPasteZone.focus();
+  });
+
   els.vendorForm.addEventListener("submit", async (event) => {
     if (event.submitter?.value === "cancel") return;
     event.preventDefault();
@@ -1458,7 +1515,7 @@ function wireEvents() {
     );
     const quoteId = els.vendorId.value || id("vendor");
     const existingQuote = (state.quotes || []).find((item) => item.id === quoteId);
-    const files = [...els.vendorAttachmentInput.files];
+    const files = [...els.vendorAttachmentInput.files, ...pendingPastedQuoteFiles];
     const uploadedAttachments = await uploadQuoteAttachments(quoteId, files);
     const quote = {
       id: quoteId,
