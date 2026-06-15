@@ -1174,13 +1174,13 @@ textarea:focus {
 
 .secondary-button {
   color: var(--text);
-  border-color: var(--line);
-  background: var(--surface-strong);
+  border-color: #52525b;
+  background: #27272a;
 }
 
 .secondary-button:hover,
 .icon-button:hover {
-  background: #27272a;
+  background: #3f3f46;
 }
 
 .ghost-button {
