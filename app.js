@@ -134,27 +134,8 @@ function createProcess(template, overrides = {}) {
 const starterData = {
   activeProcessId: "demolition",
   purchases: [],
-  processes: PROCESS_TEMPLATES.map((template) =>
-    createProcess(
-      template,
-      template.id === "wallpaper"
-        ? {
-            status: "견적 요청",
-            vendors: [
-              {
-                id: "v1",
-                name: "동네 도배 사장님",
-                contact: "카톡 견적 대기",
-                quote: 0,
-                status: "견적 요청",
-                scope: "실측 후 확정",
-                memo: "응답 빠름. 일정은 아직 미정.",
-              },
-            ],
-          }
-        : {},
-    ),
-  ),
+  quotes: [],
+  processes: PROCESS_TEMPLATES.map((template) => createProcess(template)),
 };
 
 let state = loadState();
@@ -170,9 +151,11 @@ const els = {
   dashboardBtn: document.querySelector("#dashboardBtn"),
   scheduleBtn: document.querySelector("#scheduleBtn"),
   purchaseBtn: document.querySelector("#purchaseBtn"),
+  quoteBtn: document.querySelector("#quoteBtn"),
   dashboardView: document.querySelector("#dashboardView"),
   scheduleView: document.querySelector("#scheduleView"),
   purchaseView: document.querySelector("#purchaseView"),
+  quoteView: document.querySelector("#quoteView"),
   processView: document.querySelector("#processView"),
   processList: document.querySelector("#processList"),
   activeProcessTitle: document.querySelector("#activeProcessTitle"),
@@ -198,6 +181,13 @@ const els = {
   purchaseDeductibleVat: document.querySelector("#purchaseDeductibleVat"),
   purchaseList: document.querySelector("#purchaseList"),
   addPurchaseBtn: document.querySelector("#addPurchaseBtn"),
+  quoteViewTotal: document.querySelector("#quoteViewTotal"),
+  quoteSelectedCount: document.querySelector("#quoteSelectedCount"),
+  quoteItemCount: document.querySelector("#quoteItemCount"),
+  quoteLinkedProcessCount: document.querySelector("#quoteLinkedProcessCount"),
+  quoteDeductibleVat: document.querySelector("#quoteDeductibleVat"),
+  quoteList: document.querySelector("#quoteList"),
+  addQuoteBtn: document.querySelector("#addQuoteBtn"),
   vendorGrid: document.querySelector("#vendorGrid"),
   myNote: document.querySelector("#myNote"),
   partnerNote: document.querySelector("#partnerNote"),
@@ -210,12 +200,14 @@ const els = {
   vendorForm: document.querySelector("#vendorForm"),
   vendorDialogTitle: document.querySelector("#vendorDialogTitle"),
   vendorId: document.querySelector("#vendorId"),
+  vendorTitle: document.querySelector("#vendorTitle"),
   vendorName: document.querySelector("#vendorName"),
   vendorContact: document.querySelector("#vendorContact"),
   vendorQuote: document.querySelector("#vendorQuote"),
   vendorStatus: document.querySelector("#vendorStatus"),
   vendorVatType: document.querySelector("#vendorVatType"),
   vendorVatDeductible: document.querySelector("#vendorVatDeductible"),
+  vendorProcessChecks: document.querySelector("#vendorProcessChecks"),
   vendorScope: document.querySelector("#vendorScope"),
   vendorMemo: document.querySelector("#vendorMemo"),
   deleteVendorBtn: document.querySelector("#deleteVendorBtn"),
@@ -274,20 +266,57 @@ function normalizeState(savedState) {
       focus: savedProcess.focus || template.focus,
       notes: { mine: "", partner: "", decision: "", ...(savedProcess.notes || {}) },
       tasks: Array.isArray(savedProcess.tasks) ? savedProcess.tasks : structuredClone(template.tasks),
-      vendors: Array.isArray(savedProcess.vendors) ? savedProcess.vendors : [],
+      vendors: [],
     });
   });
 
   const knownIds = new Set(PROCESS_TEMPLATES.map((template) => template.id));
-  const customProcesses = savedProcesses.filter((process) => !knownIds.has(process.id));
+  const customProcesses = savedProcesses
+    .filter((process) => !knownIds.has(process.id))
+    .map((process) => ({ ...process, vendors: [] }));
   const activeProcessId = orderedProcesses.some((process) => process.id === savedState.activeProcessId)
     ? savedState.activeProcessId
     : orderedProcesses[0].id;
+  const processes = [...orderedProcesses, ...customProcesses];
+  const knownProcessIds = new Set(processes.map((process) => process.id));
+  const savedQuotes = Array.isArray(savedState?.quotes) ? savedState.quotes : [];
+  const legacyQuotes = savedProcesses.flatMap((process) =>
+    Array.isArray(process.vendors)
+      ? process.vendors.map((vendor) => ({
+          ...vendor,
+          id: vendor.id || id("quote"),
+          title: vendor.title || process.name,
+          processIds: [process.id],
+        }))
+      : [],
+  );
+  const quotesById = new Map();
+
+  [...savedQuotes, ...legacyQuotes].forEach((quote) => {
+    if (!quote?.id) return;
+    const processIds = Array.isArray(quote.processIds)
+      ? quote.processIds.filter((processId) => knownProcessIds.has(processId))
+      : [];
+    quotesById.set(quote.id, {
+      id: quote.id,
+      title: quote.title || quote.name || "견적",
+      name: quote.name || "",
+      contact: quote.contact || "",
+      quote: Number(quote.quote || 0),
+      status: quote.status || "후보",
+      vatType: quote.vatType || "VAT 포함",
+      vatDeductible: Boolean(quote.vatDeductible),
+      scope: quote.scope || "",
+      memo: quote.memo || "",
+      processIds,
+    });
+  });
 
   return {
     activeProcessId,
     purchases: Array.isArray(savedState?.purchases) ? savedState.purchases : [],
-    processes: [...orderedProcesses, ...customProcesses],
+    quotes: [...quotesById.values()],
+    processes,
   };
 }
 
@@ -393,12 +422,6 @@ function activeProcess() {
   );
 }
 
-function money(value) {
-  const number = Number(value || 0);
-  if (!number) return "금액 미입력";
-  return new Intl.NumberFormat("ko-KR").format(number) + "원";
-}
-
 function numericMoney(value) {
   return new Intl.NumberFormat("ko-KR").format(Number(value || 0)) + "원";
 }
@@ -428,6 +451,30 @@ function vatLabel(item, amountKey) {
   const parts = [vatTypeOf(item)];
   if (item?.vatDeductible) parts.push(`공제 ${numericMoney(vatAmount(item, amountKey))}`);
   return parts.join(" · ");
+}
+
+function quoteProcessIds(quote) {
+  return Array.isArray(quote?.processIds) ? quote.processIds : [];
+}
+
+function quotesForProcess(processId) {
+  return (state.quotes || []).filter((quote) => quoteProcessIds(quote).includes(processId));
+}
+
+function selectedQuoteFor(process) {
+  return quotesForProcess(process.id).find((quote) => quote.status === "선정") || null;
+}
+
+function selectedQuotes() {
+  return (state.quotes || []).filter((quote) => quote.status === "선정");
+}
+
+function processName(processId) {
+  return state.processes.find((process) => process.id === processId)?.name || "알 수 없는 공정";
+}
+
+function processNamesForQuote(quote) {
+  return quoteProcessIds(quote).map(processName);
 }
 
 function formatDate(value) {
@@ -519,6 +566,7 @@ function render() {
   renderDashboard();
   renderSchedule();
   renderPurchases();
+  renderQuotes();
   renderProcesses(process);
   renderProcessDetail(process);
   renderVendors(process);
@@ -535,54 +583,48 @@ function renderSummary() {
   els.progressBar.style.width = `${percent}%`;
 }
 
-function selectedVendorFor(process) {
-  return process.vendors.find((vendor) => vendor.status === "선정") || null;
-}
-
 function renderDashboard() {
   const rows = state.processes.map((process, index) => {
-    const vendor = selectedVendorFor(process);
-    return { process, vendor, index };
+    const quote = selectedQuoteFor(process);
+    return { process, quote, index };
   });
-  const selectedRows = rows.filter((row) => row.vendor);
-  const total = selectedRows.reduce((sum, row) => sum + totalWithVat(row.vendor, "quote"), 0);
-  const vendorDeductibleVat = selectedRows.reduce(
-    (sum, row) => sum + deductibleVat(row.vendor, "quote"),
-    0,
-  );
+  const selectedRows = rows.filter((row) => row.quote);
+  const quoteTotal = selectedQuotes().reduce((sum, quote) => sum + totalWithVat(quote, "quote"), 0);
+  const quoteDeductibleVat = selectedQuotes().reduce((sum, quote) => sum + deductibleVat(quote, "quote"), 0);
   const purchaseDeductibleVat = (state.purchases || []).reduce(
     (sum, item) => sum + deductibleVat(item, "price"),
     0,
   );
 
-  els.totalEstimate.textContent = numericMoney(total);
+  els.totalEstimate.textContent = numericMoney(quoteTotal);
   els.selectedCount.textContent = `${selectedRows.length}건`;
   els.unselectedCount.textContent = `${state.processes.length - selectedRows.length}건`;
   els.totalProcessCount.textContent = `${state.processes.length}건`;
   els.purchaseTotal.textContent = numericMoney(purchaseTotal());
-  els.deductibleVatTotal.textContent = numericMoney(vendorDeductibleVat + purchaseDeductibleVat);
+  els.deductibleVatTotal.textContent = numericMoney(quoteDeductibleVat + purchaseDeductibleVat);
 
   els.estimateTable.innerHTML = `
     <div class="estimate-header" aria-hidden="true">
       <span>공정</span>
-      <span>선정 업체</span>
+      <span>연결 견적</span>
       <span>일정</span>
       <span>견적가</span>
     </div>
     ${rows
-      .map(({ process, vendor, index }) => {
-      const hasVendor = Boolean(vendor);
+      .map(({ process, quote, index }) => {
+      const hasQuote = Boolean(quote);
+      const linkedCount = quoteProcessIds(quote).length;
       return `
-        <button class="estimate-row ${hasVendor ? "selected" : ""}" type="button" data-process-id="${process.id}">
+        <button class="estimate-row ${hasQuote ? "selected" : ""}" type="button" data-process-id="${process.id}">
           <span class="estimate-process">
             <small>${String(index + 1).padStart(2, "0")}</small>
             ${escapeHtml(process.name)}
           </span>
-          <span class="estimate-vendor">${escapeHtml(vendor?.name || "업체 미선정")}</span>
+          <span class="estimate-vendor">${escapeHtml(quote ? `${quote.name || "업체 미입력"} · ${quote.title || "견적"}` : "견적 미연결")}</span>
           <span class="estimate-date">${escapeHtml(dateRange(process))}</span>
           <strong class="estimate-amount">
-            <span>${escapeHtml(hasVendor ? numericMoney(totalWithVat(vendor, "quote")) : "-")}</span>
-            <small>${escapeHtml(hasVendor ? vatLabel(vendor, "quote") : "VAT 미정")}</small>
+            <span>${escapeHtml(hasQuote ? numericMoney(totalWithVat(quote, "quote")) : "-")}</span>
+            <small>${escapeHtml(hasQuote ? `${vatLabel(quote, "quote")}${linkedCount > 1 ? " · 묶음" : ""}` : "VAT 미정")}</small>
           </strong>
         </button>
       `;
@@ -639,6 +681,63 @@ function renderPurchases() {
         </article>
       `,
     )
+    .join("");
+}
+
+function renderQuotes() {
+  const quotes = state.quotes || [];
+  const selected = selectedQuotes();
+  const linkedProcessIds = new Set(quotes.flatMap((quote) => quoteProcessIds(quote)));
+  const quoteDeductibleVat = quotes.reduce((sum, quote) => sum + deductibleVat(quote, "quote"), 0);
+
+  els.quoteViewTotal.textContent = numericMoney(
+    selected.reduce((sum, quote) => sum + totalWithVat(quote, "quote"), 0),
+  );
+  els.quoteSelectedCount.textContent = `${selected.length}건`;
+  els.quoteItemCount.textContent = `${quotes.length}건`;
+  els.quoteLinkedProcessCount.textContent = `${linkedProcessIds.size}건`;
+  els.quoteDeductibleVat.textContent = numericMoney(quoteDeductibleVat);
+
+  if (!quotes.length) {
+    els.quoteList.innerHTML = `
+      <div class="empty-state">
+        <div>
+          <strong>아직 견적 묶음이 없어요.</strong><br />
+          <span>업체 견적을 추가하고 관련 공정을 연결해보세요.</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  els.quoteList.innerHTML = [...quotes]
+    .sort((a, b) => totalWithVat(b, "quote") - totalWithVat(a, "quote"))
+    .map((quote) => {
+      const names = processNamesForQuote(quote);
+      return `
+        <article class="purchase-card">
+          <header>
+            <div>
+              <h4>${escapeHtml(quote.title || "견적")}</h4>
+              <p>${escapeHtml(quote.name || "업체 미입력")}</p>
+            </div>
+            <span class="pill">${escapeHtml(quote.status || "후보")}</span>
+          </header>
+          <strong>${escapeHtml(numericMoney(totalWithVat(quote, "quote")))}</strong>
+          <p>${escapeHtml(vatLabel(quote, "quote"))}</p>
+          <div class="linked-processes">
+            ${
+              names.length
+                ? names.map((name) => `<span>${escapeHtml(name)}</span>`).join("")
+                : "<span>연결 공정 없음</span>"
+            }
+          </div>
+          <p>${escapeHtml(quote.scope || "포함/미포함 조건이 비어 있어요.")}</p>
+          <p>${escapeHtml(quote.memo || "메모가 비어 있어요.")}</p>
+          <button class="secondary-button" type="button" data-edit-quote="${quote.id}">수정</button>
+        </article>
+      `;
+    })
     .join("");
 }
 
@@ -742,14 +841,17 @@ function renderView() {
   const isDashboard = currentView === "dashboard";
   const isSchedule = currentView === "schedule";
   const isPurchase = currentView === "purchase";
+  const isQuote = currentView === "quote";
 
   els.dashboardView.hidden = !isDashboard;
   els.scheduleView.hidden = !isSchedule;
   els.purchaseView.hidden = !isPurchase;
-  els.processView.hidden = isDashboard || isSchedule || isPurchase;
+  els.quoteView.hidden = !isQuote;
+  els.processView.hidden = isDashboard || isSchedule || isPurchase || isQuote;
   els.dashboardBtn.classList.toggle("active", isDashboard);
   els.scheduleBtn.classList.toggle("active", isSchedule);
   els.purchaseBtn.classList.toggle("active", isPurchase);
+  els.quoteBtn.classList.toggle("active", isQuote);
   els.processList.classList.toggle("is-detail-active", currentView === "process");
 
   if (isDashboard) {
@@ -764,6 +866,11 @@ function renderView() {
 
   if (isPurchase) {
     els.activeProcessTitle.textContent = "구매";
+    return;
+  }
+
+  if (isQuote) {
+    els.activeProcessTitle.textContent = "견적";
     return;
   }
 
@@ -794,41 +901,50 @@ function renderProcessDetail(process) {
 }
 
 function renderVendors(process) {
-  if (!process.vendors.length) {
+  const quotes = quotesForProcess(process.id);
+  if (!quotes.length) {
     els.vendorGrid.innerHTML = `
       <div class="empty-state">
         <div>
-          <strong>아직 업체 후보가 없어요.</strong><br />
-          <span>견적 받은 업체부터 하나씩 넣으면 비교가 쉬워져요.</span>
+          <strong>아직 연결된 견적이 없어요.</strong><br />
+          <span>견적을 추가하고 이 공정에 연결하면 여기서 보여요.</span>
         </div>
       </div>
     `;
     return;
   }
 
-  const sorted = [...process.vendors].sort(
+  const sorted = [...quotes].sort(
     (a, b) => totalWithVat(a, "quote") - totalWithVat(b, "quote"),
   );
   els.vendorGrid.innerHTML = sorted
     .map(
-      (vendor) => `
+      (quote) => {
+        const linkedNames = processNamesForQuote(quote).filter((name) => name !== process.name);
+        return `
         <article class="vendor-card">
           <header>
             <div>
-              <h4>${escapeHtml(vendor.name)}</h4>
-              <p>${escapeHtml(vendor.contact || "연락처 미입력")}</p>
+              <h4>${escapeHtml(quote.title || "견적")}</h4>
+              <p>${escapeHtml(quote.name || "업체 미입력")}</p>
             </div>
-            <span class="pill">${escapeHtml(vendor.status)}</span>
+            <span class="pill">${escapeHtml(quote.status)}</span>
           </header>
-          <div class="quote">${escapeHtml(numericMoney(totalWithVat(vendor, "quote")))}</div>
-          <p>${escapeHtml(vatLabel(vendor, "quote"))}</p>
-          <p>${escapeHtml(vendor.scope || "포함/미포함 조건을 적어두세요.")}</p>
-          <p>${escapeHtml(vendor.memo || "장단점 메모가 비어 있어요.")}</p>
+          <div class="quote">${escapeHtml(numericMoney(totalWithVat(quote, "quote")))}</div>
+          <p>${escapeHtml(vatLabel(quote, "quote"))}</p>
+          ${
+            linkedNames.length
+              ? `<p>${escapeHtml(`함께 연결: ${linkedNames.join(", ")}`)}</p>`
+              : ""
+          }
+          <p>${escapeHtml(quote.scope || "포함/미포함 조건을 적어두세요.")}</p>
+          <p>${escapeHtml(quote.memo || "장단점 메모가 비어 있어요.")}</p>
           <div class="card-actions">
-            <button class="secondary-button" type="button" data-edit-vendor="${vendor.id}">수정</button>
+            <button class="secondary-button" type="button" data-edit-vendor="${quote.id}">수정</button>
           </div>
         </article>
-      `,
+      `;
+      },
     )
     .join("");
 }
@@ -859,18 +975,35 @@ function updateActiveProcess(updates) {
   render();
 }
 
-function openVendorDialog(vendor = null) {
-  els.vendorDialogTitle.textContent = vendor ? "업체 수정" : "업체 추가";
-  els.vendorId.value = vendor?.id || "";
-  els.vendorName.value = vendor?.name || "";
-  els.vendorContact.value = vendor?.contact || "";
-  els.vendorQuote.value = vendor?.quote || "";
-  els.vendorStatus.value = vendor?.status || "후보";
-  els.vendorVatType.value = vendor?.vatType || "VAT 포함";
-  els.vendorVatDeductible.checked = Boolean(vendor?.vatDeductible);
-  els.vendorScope.value = vendor?.scope || "";
-  els.vendorMemo.value = vendor?.memo || "";
-  els.deleteVendorBtn.style.display = vendor ? "inline-flex" : "none";
+function renderProcessChecks(selectedProcessIds = []) {
+  const selected = new Set(selectedProcessIds);
+  els.vendorProcessChecks.innerHTML = state.processes
+    .map(
+      (process, index) => `
+        <label>
+          <input type="checkbox" value="${escapeHtml(process.id)}" ${selected.has(process.id) ? "checked" : ""} />
+          <span>${String(index + 1).padStart(2, "0")} ${escapeHtml(process.name)}</span>
+        </label>
+      `,
+    )
+    .join("");
+}
+
+function openVendorDialog(quote = null, defaultProcessIds = [activeProcess().id]) {
+  const processIds = quote ? quoteProcessIds(quote) : defaultProcessIds;
+  els.vendorDialogTitle.textContent = quote ? "견적 수정" : "견적 추가";
+  els.vendorId.value = quote?.id || "";
+  els.vendorTitle.value = quote?.title || "";
+  els.vendorName.value = quote?.name || "";
+  els.vendorContact.value = quote?.contact || "";
+  els.vendorQuote.value = quote?.quote || "";
+  els.vendorStatus.value = quote?.status || "후보";
+  els.vendorVatType.value = quote?.vatType || "VAT 포함";
+  els.vendorVatDeductible.checked = Boolean(quote?.vatDeductible);
+  els.vendorScope.value = quote?.scope || "";
+  els.vendorMemo.value = quote?.memo || "";
+  renderProcessChecks(processIds.length ? processIds : [activeProcess().id]);
+  els.deleteVendorBtn.style.display = quote ? "inline-flex" : "none";
   els.vendorDialog.showModal();
 }
 
@@ -924,6 +1057,11 @@ function wireEvents() {
     render();
   });
 
+  els.quoteBtn.addEventListener("click", () => {
+    currentView = "quote";
+    render();
+  });
+
   els.processList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-process-id]");
     if (!button) return;
@@ -954,6 +1092,15 @@ function wireEvents() {
   });
 
   els.addPurchaseBtn.addEventListener("click", () => openPurchaseDialog());
+
+  els.addQuoteBtn.addEventListener("click", () => openVendorDialog(null, []));
+
+  els.quoteList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-edit-quote]");
+    if (!button) return;
+    const quote = (state.quotes || []).find((entry) => entry.id === button.dataset.editQuote);
+    openVendorDialog(quote, []);
+  });
 
   els.purchaseList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-edit-purchase]");
@@ -1056,17 +1203,20 @@ function wireEvents() {
   els.vendorGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-edit-vendor]");
     if (!button) return;
-    const vendor = activeProcess().vendors.find((item) => item.id === button.dataset.editVendor);
-    openVendorDialog(vendor);
+    const quote = (state.quotes || []).find((item) => item.id === button.dataset.editVendor);
+    openVendorDialog(quote);
   });
 
   els.vendorForm.addEventListener("submit", (event) => {
     if (event.submitter?.value === "cancel") return;
     event.preventDefault();
 
-    const process = activeProcess();
-    const vendor = {
+    const processIds = [...els.vendorProcessChecks.querySelectorAll("input:checked")].map(
+      (input) => input.value,
+    );
+    const quote = {
       id: els.vendorId.value || id("vendor"),
+      title: els.vendorTitle.value.trim() || els.vendorName.value.trim() || "견적",
       name: els.vendorName.value.trim(),
       contact: els.vendorContact.value.trim(),
       quote: Number(els.vendorQuote.value || 0),
@@ -1075,13 +1225,15 @@ function wireEvents() {
       vatDeductible: els.vendorVatDeductible.checked,
       scope: els.vendorScope.value.trim(),
       memo: els.vendorMemo.value.trim(),
+      processIds,
     };
 
-    const existingIndex = process.vendors.findIndex((item) => item.id === vendor.id);
+    state.quotes = state.quotes || [];
+    const existingIndex = state.quotes.findIndex((item) => item.id === quote.id);
     if (existingIndex >= 0) {
-      process.vendors[existingIndex] = vendor;
+      state.quotes[existingIndex] = quote;
     } else {
-      process.vendors.push(vendor);
+      state.quotes.push(quote);
     }
 
     saveState();
@@ -1090,10 +1242,9 @@ function wireEvents() {
   });
 
   els.deleteVendorBtn.addEventListener("click", () => {
-    const vendorId = els.vendorId.value;
-    if (!vendorId || !confirm("이 업체를 삭제할까요?")) return;
-    const process = activeProcess();
-    process.vendors = process.vendors.filter((vendor) => vendor.id !== vendorId);
+    const quoteId = els.vendorId.value;
+    if (!quoteId || !confirm("이 견적을 삭제할까요?")) return;
+    state.quotes = (state.quotes || []).filter((quote) => quote.id !== quoteId);
     saveState();
     els.vendorDialog.close();
     render();

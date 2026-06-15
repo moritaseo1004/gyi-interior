@@ -51,6 +51,7 @@
           <button id="dashboardBtn" class="dashboard-nav active" data-label="전체" type="button">대시보드</button>
           <button id="scheduleBtn" class="dashboard-nav" data-label="일정" type="button">일정</button>
           <button id="purchaseBtn" class="dashboard-nav" data-label="구매" type="button">구매</button>
+          <button id="quoteBtn" class="dashboard-nav" data-label="견적" type="button">견적</button>
           <nav id="processList" class="process-list" aria-label="공정 목록"></nav>
         </div>
 
@@ -69,7 +70,7 @@
           <div class="dashboard-hero">
             <div>
               <p class="eyebrow">전체 대시보드</p>
-              <h3>선정 업체 총 견적</h3>
+              <h3>선정 견적 총액</h3>
             </div>
             <strong id="totalEstimate">0원</strong>
           </div>
@@ -145,6 +146,42 @@
           <div id="purchaseList" class="purchase-list"></div>
         </section>
 
+        <section id="quoteView" class="view-screen dashboard-panel" aria-label="견적 목록" hidden>
+          <div class="dashboard-hero">
+            <div>
+              <p class="eyebrow">계약 / 견적 묶음</p>
+              <h3>여러 공정에 걸친 견적</h3>
+            </div>
+            <strong id="quoteViewTotal">0원</strong>
+          </div>
+          <div class="dashboard-stats">
+            <div>
+              <span>선정 견적</span>
+              <strong id="quoteSelectedCount">0건</strong>
+            </div>
+            <div>
+              <span>전체 견적</span>
+              <strong id="quoteItemCount">0건</strong>
+            </div>
+            <div>
+              <span>연결 공정</span>
+              <strong id="quoteLinkedProcessCount">0건</strong>
+            </div>
+            <div>
+              <span>공제 가능 VAT</span>
+              <strong id="quoteDeductibleVat">0원</strong>
+            </div>
+          </div>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">견적 단위</p>
+              <h3>업체와 연결 공정 관리</h3>
+            </div>
+            <button id="addQuoteBtn" class="primary-button" type="button">+ 견적 추가</button>
+          </div>
+          <div id="quoteList" class="purchase-list"></div>
+        </section>
+
         <div id="processView" class="view-screen" hidden>
           <section class="status-strip" aria-label="공정 상태">
             <label>
@@ -169,10 +206,10 @@
             <div class="panel panel-main">
               <div class="section-heading">
                 <div>
-                  <p class="eyebrow">업체 후보</p>
-                  <h3>견적 비교</h3>
+                  <p class="eyebrow">연결 견적</p>
+                  <h3>이 공정에 걸린 견적</h3>
                 </div>
-                <button id="addVendorBtn" class="primary-button" type="button">+ 업체 추가</button>
+                <button id="addVendorBtn" class="primary-button" type="button">+ 견적 추가</button>
               </div>
               <div id="vendorGrid" class="vendor-grid"></div>
             </div>
@@ -219,13 +256,17 @@
       <form id="vendorForm" method="dialog" class="dialog-card">
         <div class="section-heading compact">
           <div>
-            <p class="eyebrow">업체 정보</p>
-            <h3 id="vendorDialogTitle">업체 추가</h3>
+            <p class="eyebrow">견적 정보</p>
+            <h3 id="vendorDialogTitle">견적 추가</h3>
           </div>
           <button class="icon-button" value="cancel" type="submit" title="닫기">×</button>
         </div>
 
         <input id="vendorId" type="hidden" />
+        <label>
+          <span>견적명</span>
+          <input id="vendorTitle" type="text" placeholder="예: 욕실 패키지, 도배공사" />
+        </label>
         <label>
           <span>업체명</span>
           <input id="vendorName" required type="text" placeholder="예: 우리집 도배" />
@@ -254,6 +295,10 @@
             <span>VAT 공제 가능</span>
           </label>
         </div>
+        <label>
+          <span>연결 공정</span>
+          <div id="vendorProcessChecks" class="process-check-list"></div>
+        </label>
         <label>
           <span>포함 / 미포함 / 조건</span>
           <textarea id="vendorScope" rows="3" placeholder="자재 포함, 철거 별도, VAT 포함 여부 등"></textarea>
