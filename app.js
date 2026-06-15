@@ -513,8 +513,15 @@ function renderDashboard() {
   els.totalProcessCount.textContent = `${state.processes.length}건`;
   els.purchaseTotal.textContent = money(purchaseTotal());
 
-  els.estimateTable.innerHTML = rows
-    .map(({ process, vendor, index }) => {
+  els.estimateTable.innerHTML = `
+    <div class="estimate-header" aria-hidden="true">
+      <span>공정</span>
+      <span>선정 업체</span>
+      <span>일정</span>
+      <span>견적가</span>
+    </div>
+    ${rows
+      .map(({ process, vendor, index }) => {
       const hasVendor = Boolean(vendor);
       return `
         <button class="estimate-row ${hasVendor ? "selected" : ""}" type="button" data-process-id="${process.id}">
@@ -524,11 +531,12 @@ function renderDashboard() {
           </span>
           <span class="estimate-vendor">${escapeHtml(vendor?.name || "업체 미선정")}</span>
           <span class="estimate-date">${escapeHtml(dateRange(process))}</span>
-          <strong>${escapeHtml(hasVendor ? money(vendor.quote) : "-")}</strong>
+          <strong class="estimate-amount">${escapeHtml(hasVendor ? money(vendor.quote) : "-")}</strong>
         </button>
       `;
     })
-    .join("");
+    .join("")}
+  `;
 }
 
 function purchaseTotal() {
