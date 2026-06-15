@@ -26,6 +26,8 @@ const VENDOR_STATUSES = [
   "탈락",
 ];
 
+const PURCHASE_STATUSES = ["구매 예정", "비교 중", "주문 완료", "배송 중", "구매 완료", "보류"];
+
 const PROCESS_TEMPLATES = [
   {
     id: "demolition",
@@ -130,6 +132,7 @@ function createProcess(template, overrides = {}) {
 
 const starterData = {
   activeProcessId: "demolition",
+  purchases: [],
   processes: PROCESS_TEMPLATES.map((template) =>
     createProcess(
       template,
@@ -165,8 +168,10 @@ const els = {
   loginError: document.querySelector("#loginError"),
   dashboardBtn: document.querySelector("#dashboardBtn"),
   scheduleBtn: document.querySelector("#scheduleBtn"),
+  purchaseBtn: document.querySelector("#purchaseBtn"),
   dashboardView: document.querySelector("#dashboardView"),
   scheduleView: document.querySelector("#scheduleView"),
+  purchaseView: document.querySelector("#purchaseView"),
   processView: document.querySelector("#processView"),
   processList: document.querySelector("#processList"),
   activeProcessTitle: document.querySelector("#activeProcessTitle"),
@@ -180,9 +185,16 @@ const els = {
   selectedCount: document.querySelector("#selectedCount"),
   unselectedCount: document.querySelector("#unselectedCount"),
   totalProcessCount: document.querySelector("#totalProcessCount"),
+  purchaseTotal: document.querySelector("#purchaseTotal"),
   estimateTable: document.querySelector("#estimateTable"),
   scheduleSummary: document.querySelector("#scheduleSummary"),
   scheduleList: document.querySelector("#scheduleList"),
+  purchaseViewTotal: document.querySelector("#purchaseViewTotal"),
+  purchasePlannedCount: document.querySelector("#purchasePlannedCount"),
+  purchaseDoneCount: document.querySelector("#purchaseDoneCount"),
+  purchaseItemCount: document.querySelector("#purchaseItemCount"),
+  purchaseList: document.querySelector("#purchaseList"),
+  addPurchaseBtn: document.querySelector("#addPurchaseBtn"),
   vendorGrid: document.querySelector("#vendorGrid"),
   myNote: document.querySelector("#myNote"),
   partnerNote: document.querySelector("#partnerNote"),
@@ -202,6 +214,17 @@ const els = {
   vendorScope: document.querySelector("#vendorScope"),
   vendorMemo: document.querySelector("#vendorMemo"),
   deleteVendorBtn: document.querySelector("#deleteVendorBtn"),
+  purchaseDialog: document.querySelector("#purchaseDialog"),
+  purchaseForm: document.querySelector("#purchaseForm"),
+  purchaseDialogTitle: document.querySelector("#purchaseDialogTitle"),
+  purchaseId: document.querySelector("#purchaseId"),
+  purchaseName: document.querySelector("#purchaseName"),
+  purchaseCategory: document.querySelector("#purchaseCategory"),
+  purchaseStatus: document.querySelector("#purchaseStatus"),
+  purchasePrice: document.querySelector("#purchasePrice"),
+  purchaseStore: document.querySelector("#purchaseStore"),
+  purchaseMemo: document.querySelector("#purchaseMemo"),
+  deletePurchaseBtn: document.querySelector("#deletePurchaseBtn"),
 };
 
 function loadState() {
@@ -256,6 +279,7 @@ function normalizeState(savedState) {
 
   return {
     activeProcessId,
+    purchases: Array.isArray(savedState?.purchases) ? savedState.purchases : [],
     processes: [...orderedProcesses, ...customProcesses],
   };
 }
@@ -326,6 +350,7 @@ function setAuthenticatedView(isAuthenticated) {
 async function boot() {
   fillSelect(els.processStatus, PROCESS_STATUSES);
   fillSelect(els.vendorStatus, VENDOR_STATUSES);
+  fillSelect(els.purchaseStatus, PURCHASE_STATUSES);
   wireEvents();
 
   if (!isRemoteEnabled()) {
@@ -453,6 +478,7 @@ function render() {
   renderSummary();
   renderDashboard();
   renderSchedule();
+  renderPurchases();
   renderProcesses(process);
   renderProcessDetail(process);
   renderVendors(process);
@@ -485,6 +511,7 @@ function renderDashboard() {
   els.selectedCount.textContent = `${selectedRows.length}건`;
   els.unselectedCount.textContent = `${state.processes.length - selectedRows.length}건`;
   els.totalProcessCount.textContent = `${state.processes.length}건`;
+  els.purchaseTotal.textContent = money(purchaseTotal());
 
   els.estimateTable.innerHTML = rows
     .map(({ process, vendor, index }) => {
@@ -501,6 +528,53 @@ function renderDashboard() {
         </button>
       `;
     })
+    .join("");
+}
+
+function purchaseTotal() {
+  return (state.purchases || []).reduce((sum, item) => sum + Number(item.price || 0), 0);
+}
+
+function renderPurchases() {
+  const purchases = state.purchases || [];
+  const plannedCount = purchases.filter((item) => item.status !== "구매 완료").length;
+  const doneCount = purchases.filter((item) => item.status === "구매 완료").length;
+
+  els.purchaseViewTotal.textContent = money(purchaseTotal());
+  els.purchasePlannedCount.textContent = `${plannedCount}건`;
+  els.purchaseDoneCount.textContent = `${doneCount}건`;
+  els.purchaseItemCount.textContent = `${purchases.length}건`;
+
+  if (!purchases.length) {
+    els.purchaseList.innerHTML = `
+      <div class="empty-state">
+        <div>
+          <strong>아직 구매 품목이 없어요.</strong><br />
+          <span>공정과 별개로 사야 할 항목을 추가해두세요.</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  els.purchaseList.innerHTML = purchases
+    .map(
+      (item) => `
+        <article class="purchase-card">
+          <header>
+            <div>
+              <h4>${escapeHtml(item.name)}</h4>
+              <p>${escapeHtml(item.category || "분류 미입력")}</p>
+            </div>
+            <span class="pill">${escapeHtml(item.status || "구매 예정")}</span>
+          </header>
+          <strong>${escapeHtml(money(item.price))}</strong>
+          <p>${escapeHtml(item.store || "구매처 미입력")}</p>
+          <p>${escapeHtml(item.memo || "메모가 비어 있어요.")}</p>
+          <button class="secondary-button" type="button" data-edit-purchase="${item.id}">수정</button>
+        </article>
+      `,
+    )
     .join("");
 }
 
@@ -603,12 +677,15 @@ function renderView() {
   const processIndex = state.processes.findIndex((item) => item.id === process.id);
   const isDashboard = currentView === "dashboard";
   const isSchedule = currentView === "schedule";
+  const isPurchase = currentView === "purchase";
 
   els.dashboardView.hidden = !isDashboard;
   els.scheduleView.hidden = !isSchedule;
-  els.processView.hidden = isDashboard || isSchedule;
+  els.purchaseView.hidden = !isPurchase;
+  els.processView.hidden = isDashboard || isSchedule || isPurchase;
   els.dashboardBtn.classList.toggle("active", isDashboard);
   els.scheduleBtn.classList.toggle("active", isSchedule);
+  els.purchaseBtn.classList.toggle("active", isPurchase);
   els.processList.classList.toggle("is-detail-active", currentView === "process");
 
   if (isDashboard) {
@@ -618,6 +695,11 @@ function renderView() {
 
   if (isSchedule) {
     els.activeProcessTitle.textContent = "일정";
+    return;
+  }
+
+  if (isPurchase) {
+    els.activeProcessTitle.textContent = "구매";
     return;
   }
 
@@ -723,6 +805,19 @@ function openVendorDialog(vendor = null) {
   els.vendorDialog.showModal();
 }
 
+function openPurchaseDialog(item = null) {
+  els.purchaseDialogTitle.textContent = item ? "품목 수정" : "품목 추가";
+  els.purchaseId.value = item?.id || "";
+  els.purchaseName.value = item?.name || "";
+  els.purchaseCategory.value = item?.category || "";
+  els.purchaseStatus.value = item?.status || "구매 예정";
+  els.purchasePrice.value = item?.price || "";
+  els.purchaseStore.value = item?.store || "";
+  els.purchaseMemo.value = item?.memo || "";
+  els.deletePurchaseBtn.style.display = item ? "inline-flex" : "none";
+  els.purchaseDialog.showModal();
+}
+
 function wireEvents() {
   els.loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -753,6 +848,11 @@ function wireEvents() {
     render();
   });
 
+  els.purchaseBtn.addEventListener("click", () => {
+    currentView = "purchase";
+    render();
+  });
+
   els.processList.addEventListener("click", (event) => {
     const button = event.target.closest("[data-process-id]");
     if (!button) return;
@@ -780,6 +880,51 @@ function wireEvents() {
     saveState();
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  els.addPurchaseBtn.addEventListener("click", () => openPurchaseDialog());
+
+  els.purchaseList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-edit-purchase]");
+    if (!button) return;
+    const item = (state.purchases || []).find((entry) => entry.id === button.dataset.editPurchase);
+    openPurchaseDialog(item);
+  });
+
+  els.purchaseForm.addEventListener("submit", (event) => {
+    if (event.submitter?.value === "cancel") return;
+    event.preventDefault();
+
+    const item = {
+      id: els.purchaseId.value || id("purchase"),
+      name: els.purchaseName.value.trim(),
+      category: els.purchaseCategory.value.trim(),
+      status: els.purchaseStatus.value,
+      price: Number(els.purchasePrice.value || 0),
+      store: els.purchaseStore.value.trim(),
+      memo: els.purchaseMemo.value.trim(),
+    };
+
+    state.purchases = state.purchases || [];
+    const existingIndex = state.purchases.findIndex((entry) => entry.id === item.id);
+    if (existingIndex >= 0) {
+      state.purchases[existingIndex] = item;
+    } else {
+      state.purchases.push(item);
+    }
+
+    saveState();
+    els.purchaseDialog.close();
+    render();
+  });
+
+  els.deletePurchaseBtn.addEventListener("click", () => {
+    const purchaseId = els.purchaseId.value;
+    if (!purchaseId || !confirm("이 구매 품목을 삭제할까요?")) return;
+    state.purchases = (state.purchases || []).filter((item) => item.id !== purchaseId);
+    saveState();
+    els.purchaseDialog.close();
+    render();
   });
 
   els.addProcessBtn.addEventListener("click", () => {

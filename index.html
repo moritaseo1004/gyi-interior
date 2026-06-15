@@ -50,6 +50,7 @@
         <div class="nav-scroll">
           <button id="dashboardBtn" class="dashboard-nav active" data-label="전체" type="button">대시보드</button>
           <button id="scheduleBtn" class="dashboard-nav" data-label="일정" type="button">일정</button>
+          <button id="purchaseBtn" class="dashboard-nav" data-label="구매" type="button">구매</button>
           <nav id="processList" class="process-list" aria-label="공정 목록"></nav>
         </div>
 
@@ -85,6 +86,10 @@
               <span>전체 공정</span>
               <strong id="totalProcessCount">0건</strong>
             </div>
+            <div>
+              <span>별도 구매</span>
+              <strong id="purchaseTotal">0원</strong>
+            </div>
           </div>
           <div id="estimateTable" class="estimate-table"></div>
         </section>
@@ -98,6 +103,38 @@
             <strong id="scheduleSummary">일정 미정</strong>
           </div>
           <div id="scheduleList" class="schedule-list"></div>
+        </section>
+
+        <section id="purchaseView" class="view-screen dashboard-panel" aria-label="구매 목록" hidden>
+          <div class="dashboard-hero">
+            <div>
+              <p class="eyebrow">별도 구매</p>
+              <h3>구매 품목</h3>
+            </div>
+            <strong id="purchaseViewTotal">0원</strong>
+          </div>
+          <div class="dashboard-stats">
+            <div>
+              <span>구매 예정</span>
+              <strong id="purchasePlannedCount">0건</strong>
+            </div>
+            <div>
+              <span>구매 완료</span>
+              <strong id="purchaseDoneCount">0건</strong>
+            </div>
+            <div>
+              <span>전체 품목</span>
+              <strong id="purchaseItemCount">0건</strong>
+            </div>
+          </div>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">공정 외 항목</p>
+              <h3>가전, 자재, 소품, 설치품</h3>
+            </div>
+            <button id="addPurchaseBtn" class="primary-button" type="button">+ 품목 추가</button>
+          </div>
+          <div id="purchaseList" class="purchase-list"></div>
         </section>
 
         <div id="processView" class="view-screen" hidden>
@@ -209,6 +246,52 @@
         </label>
         <div class="dialog-actions">
           <button id="deleteVendorBtn" class="danger-button" type="button">삭제</button>
+          <button class="primary-button" value="default" type="submit">저장</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="purchaseDialog">
+      <form id="purchaseForm" method="dialog" class="dialog-card">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">구매 품목</p>
+            <h3 id="purchaseDialogTitle">품목 추가</h3>
+          </div>
+          <button class="icon-button" value="cancel" type="submit" title="닫기">×</button>
+        </div>
+
+        <input id="purchaseId" type="hidden" />
+        <label>
+          <span>품목명</span>
+          <input id="purchaseName" required type="text" placeholder="예: 주방 수전, 블라인드, 콘센트" />
+        </label>
+        <div class="two-col">
+          <label>
+            <span>분류</span>
+            <input id="purchaseCategory" type="text" placeholder="예: 욕실, 조명, 가구, 기타" />
+          </label>
+          <label>
+            <span>상태</span>
+            <select id="purchaseStatus"></select>
+          </label>
+        </div>
+        <div class="two-col">
+          <label>
+            <span>금액</span>
+            <input id="purchasePrice" min="0" step="1000" type="number" placeholder="0" />
+          </label>
+          <label>
+            <span>구매처 / 링크</span>
+            <input id="purchaseStore" type="text" placeholder="오늘의집, 쿠팡, 오프라인 등" />
+          </label>
+        </div>
+        <label>
+          <span>메모</span>
+          <textarea id="purchaseMemo" rows="4" placeholder="옵션, 사이즈, 배송일, 설치 여부 등"></textarea>
+        </label>
+        <div class="dialog-actions">
+          <button id="deletePurchaseBtn" class="danger-button" type="button">삭제</button>
           <button class="primary-button" value="default" type="submit">저장</button>
         </div>
       </form>
