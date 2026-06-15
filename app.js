@@ -465,6 +465,15 @@ function selectedQuoteFor(process) {
   return quotesForProcess(process.id).find((quote) => quote.status === "선정") || null;
 }
 
+function dashboardQuoteFor(process) {
+  const quotes = quotesForProcess(process.id);
+  return (
+    quotes.find((quote) => quote.status === "선정") ||
+    [...quotes].sort((a, b) => totalWithVat(b, "quote") - totalWithVat(a, "quote"))[0] ||
+    null
+  );
+}
+
 function selectedQuotes() {
   return (state.quotes || []).filter((quote) => quote.status === "선정");
 }
@@ -585,10 +594,11 @@ function renderSummary() {
 
 function renderDashboard() {
   const rows = state.processes.map((process, index) => {
-    const quote = selectedQuoteFor(process);
-    return { process, quote, index };
+    const quote = dashboardQuoteFor(process);
+    const selectedQuote = selectedQuoteFor(process);
+    return { process, quote, selectedQuote, index };
   });
-  const selectedRows = rows.filter((row) => row.quote);
+  const selectedRows = rows.filter((row) => row.selectedQuote);
   const quoteTotal = selectedQuotes().reduce((sum, quote) => sum + totalWithVat(quote, "quote"), 0);
   const quoteDeductibleVat = selectedQuotes().reduce((sum, quote) => sum + deductibleVat(quote, "quote"), 0);
   const purchaseDeductibleVat = (state.purchases || []).reduce(
@@ -611,16 +621,17 @@ function renderDashboard() {
       <span>견적가</span>
     </div>
     ${rows
-      .map(({ process, quote, index }) => {
+      .map(({ process, quote, selectedQuote, index }) => {
       const hasQuote = Boolean(quote);
+      const isSelected = Boolean(selectedQuote);
       const linkedCount = quoteProcessIds(quote).length;
       return `
-        <button class="estimate-row ${hasQuote ? "selected" : ""}" type="button" data-process-id="${process.id}">
+        <button class="estimate-row ${isSelected ? "selected" : ""}" type="button" data-process-id="${process.id}">
           <span class="estimate-process">
             <small>${String(index + 1).padStart(2, "0")}</small>
             ${escapeHtml(process.name)}
           </span>
-          <span class="estimate-vendor">${escapeHtml(quote ? `${quote.name || "업체 미입력"} · ${quote.title || "견적"}` : "견적 미연결")}</span>
+          <span class="estimate-vendor">${escapeHtml(quote ? `${quote.name || "업체 미입력"} · ${quote.title || "견적"} · ${quote.status || "후보"}` : "견적 미연결")}</span>
           <span class="estimate-date">${escapeHtml(dateRange(process))}</span>
           <strong class="estimate-amount">
             <span>${escapeHtml(hasQuote ? numericMoney(totalWithVat(quote, "quote")) : "-")}</span>
