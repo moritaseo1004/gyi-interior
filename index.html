@@ -307,6 +307,11 @@
           <span>장단점 메모</span>
           <textarea id="vendorMemo" rows="4" placeholder="응답 빠름, 일정 가능, 가격 높음 등"></textarea>
         </label>
+        <label>
+          <span>견적서 첨부</span>
+          <input id="vendorAttachmentInput" type="file" multiple accept="image/*,.pdf" />
+        </label>
+        <div id="vendorAttachmentList" class="attachment-list"></div>
         <div class="dialog-actions">
           <button id="deleteVendorBtn" class="danger-button" type="button">삭제</button>
           <button class="primary-button" value="default" type="submit">저장</button>

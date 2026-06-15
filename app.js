@@ -1,4 +1,5 @@
 const STORAGE_KEY = "interior-tracker-v1";
+const QUOTE_FILE_BUCKET = "quote-files";
 const SUPABASE_SETTINGS = window.INTERIOR_SUPABASE || {};
 const supabaseClient =
   window.supabase && SUPABASE_SETTINGS.url && SUPABASE_SETTINGS.anonKey
@@ -210,6 +211,8 @@ const els = {
   vendorProcessChecks: document.querySelector("#vendorProcessChecks"),
   vendorScope: document.querySelector("#vendorScope"),
   vendorMemo: document.querySelector("#vendorMemo"),
+  vendorAttachmentInput: document.querySelector("#vendorAttachmentInput"),
+  vendorAttachmentList: document.querySelector("#vendorAttachmentList"),
   deleteVendorBtn: document.querySelector("#deleteVendorBtn"),
   purchaseDialog: document.querySelector("#purchaseDialog"),
   purchaseForm: document.querySelector("#purchaseForm"),
@@ -308,6 +311,7 @@ function normalizeState(savedState) {
       vatDeductible: Boolean(quote.vatDeductible),
       scope: quote.scope || "",
       memo: quote.memo || "",
+      attachments: Array.isArray(quote.attachments) ? quote.attachments : [],
       processIds,
     });
   });
@@ -347,6 +351,57 @@ async function persistRemoteState() {
   });
 
   if (error) console.error("Supabase save failed:", error);
+}
+
+function safeFileName(name) {
+  return String(name || "file")
+    .replace(/[^\w.\-가-힣]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80) || "file";
+}
+
+async function uploadQuoteAttachments(quoteId, files) {
+  if (!files.length) return [];
+  if (!isRemoteEnabled()) {
+    alert("파일 첨부는 Supabase 연결 상태에서만 사용할 수 있어요.");
+    return [];
+  }
+
+  const uploaded = [];
+  for (const file of files) {
+    const path = `${quoteId}/${Date.now()}-${Math.random().toString(16).slice(2)}-${safeFileName(file.name)}`;
+    const { error } = await supabaseClient.storage
+      .from(QUOTE_FILE_BUCKET)
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type || "application/octet-stream",
+      });
+
+    if (error) {
+      alert(`첨부 업로드 실패: ${error.message}`);
+      continue;
+    }
+
+    const { data } = supabaseClient.storage.from(QUOTE_FILE_BUCKET).getPublicUrl(path);
+    uploaded.push({
+      name: file.name,
+      path,
+      url: data.publicUrl,
+      type: file.type,
+      size: file.size,
+      uploadedAt: new Date().toISOString(),
+    });
+  }
+
+  return uploaded;
+}
+
+async function deleteQuoteAttachment(path) {
+  if (!path || !isRemoteEnabled()) return;
+  const { error } = await supabaseClient.storage.from(QUOTE_FILE_BUCKET).remove([path]);
+  if (error) console.error("Attachment delete failed:", error);
 }
 
 async function loadRemoteState() {
@@ -484,6 +539,29 @@ function processName(processId) {
 
 function processNamesForQuote(quote) {
   return quoteProcessIds(quote).map(processName);
+}
+
+function quoteAttachments(quote) {
+  return Array.isArray(quote?.attachments) ? quote.attachments : [];
+}
+
+function renderAttachmentLinks(quote) {
+  const attachments = quoteAttachments(quote);
+  if (!attachments.length) return "";
+
+  return `
+    <div class="attachment-links">
+      ${attachments
+        .map(
+          (attachment) => `
+            <a href="${escapeHtml(attachment.url)}" target="_blank" rel="noreferrer">
+              ${escapeHtml(attachment.name || "첨부파일")}
+            </a>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function viewButton(label, target, extra = "") {
@@ -844,6 +922,7 @@ function renderQuotes() {
           </div>
           <p>${escapeHtml(quote.scope || "포함/미포함 조건이 비어 있어요.")}</p>
           <p>${escapeHtml(quote.memo || "메모가 비어 있어요.")}</p>
+          ${renderAttachmentLinks(quote)}
           <button class="secondary-button" type="button" data-edit-quote="${quote.id}">수정</button>
         </article>
       `;
@@ -1049,6 +1128,7 @@ function renderVendors(process) {
           }
           <p>${escapeHtml(quote.scope || "포함/미포함 조건을 적어두세요.")}</p>
           <p>${escapeHtml(quote.memo || "장단점 메모가 비어 있어요.")}</p>
+          ${renderAttachmentLinks(quote)}
           <div class="card-actions">
             <button class="secondary-button" type="button" data-edit-vendor="${quote.id}">수정</button>
           </div>
@@ -1099,6 +1179,24 @@ function renderProcessChecks(selectedProcessIds = []) {
     .join("");
 }
 
+function renderAttachmentList(attachments = []) {
+  if (!attachments.length) {
+    els.vendorAttachmentList.innerHTML = `<span class="quiet-line">첨부된 견적서가 없어요.</span>`;
+    return;
+  }
+
+  els.vendorAttachmentList.innerHTML = attachments
+    .map(
+      (attachment) => `
+        <div class="attachment-item" data-attachment-path="${escapeHtml(attachment.path || "")}">
+          <a href="${escapeHtml(attachment.url)}" target="_blank" rel="noreferrer">${escapeHtml(attachment.name || "첨부파일")}</a>
+          <button class="icon-button" type="button" title="첨부 삭제">×</button>
+        </div>
+      `,
+    )
+    .join("");
+}
+
 function openVendorDialog(quote = null, defaultProcessIds = [activeProcess().id]) {
   const processIds = quote ? quoteProcessIds(quote) : defaultProcessIds;
   els.vendorDialogTitle.textContent = quote ? "견적 수정" : "견적 추가";
@@ -1112,6 +1210,8 @@ function openVendorDialog(quote = null, defaultProcessIds = [activeProcess().id]
   els.vendorVatDeductible.checked = Boolean(quote?.vatDeductible);
   els.vendorScope.value = quote?.scope || "";
   els.vendorMemo.value = quote?.memo || "";
+  els.vendorAttachmentInput.value = "";
+  renderAttachmentList(quoteAttachments(quote));
   renderProcessChecks(processIds.length ? processIds : [activeProcess().id]);
   els.deleteVendorBtn.style.display = quote ? "inline-flex" : "none";
   els.vendorDialog.showModal();
@@ -1332,15 +1432,36 @@ function wireEvents() {
     openVendorDialog(quote);
   });
 
-  els.vendorForm.addEventListener("submit", (event) => {
+  els.vendorAttachmentList.addEventListener("click", async (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const item = button.closest("[data-attachment-path]");
+    const path = item?.dataset.attachmentPath;
+    const quoteId = els.vendorId.value;
+    if (!path || !quoteId || !confirm("이 첨부파일을 삭제할까요?")) return;
+
+    const quote = (state.quotes || []).find((entry) => entry.id === quoteId);
+    if (!quote) return;
+    quote.attachments = quoteAttachments(quote).filter((attachment) => attachment.path !== path);
+    await deleteQuoteAttachment(path);
+    saveState();
+    renderAttachmentList(quote.attachments);
+    render();
+  });
+
+  els.vendorForm.addEventListener("submit", async (event) => {
     if (event.submitter?.value === "cancel") return;
     event.preventDefault();
 
     const processIds = [...els.vendorProcessChecks.querySelectorAll("input:checked")].map(
       (input) => input.value,
     );
+    const quoteId = els.vendorId.value || id("vendor");
+    const existingQuote = (state.quotes || []).find((item) => item.id === quoteId);
+    const files = [...els.vendorAttachmentInput.files];
+    const uploadedAttachments = await uploadQuoteAttachments(quoteId, files);
     const quote = {
-      id: els.vendorId.value || id("vendor"),
+      id: quoteId,
       title: els.vendorTitle.value.trim() || els.vendorName.value.trim() || "견적",
       name: els.vendorName.value.trim(),
       contact: els.vendorContact.value.trim(),
@@ -1350,6 +1471,7 @@ function wireEvents() {
       vatDeductible: els.vendorVatDeductible.checked,
       scope: els.vendorScope.value.trim(),
       memo: els.vendorMemo.value.trim(),
+      attachments: [...quoteAttachments(existingQuote), ...uploadedAttachments],
       processIds,
     };
 

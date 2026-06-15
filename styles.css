@@ -705,6 +705,60 @@ button:focus-visible {
   font-weight: 800;
 }
 
+.attachment-links,
+.attachment-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.attachment-links a,
+.attachment-item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.attachment-links a {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.attachment-links a:hover {
+  border-color: #3f3f46;
+  background: #18181b;
+}
+
+.attachment-item {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.attachment-item a {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.attachment-item .icon-button {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  font-size: 16px;
+}
+
 .estimate-process {
   display: flex;
   gap: 8px;
