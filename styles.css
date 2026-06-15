@@ -890,6 +890,25 @@ textarea {
   outline: none;
 }
 
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  border-radius: 6px;
+  background-color: rgba(250, 250, 250, 0.14);
+  cursor: pointer;
+  filter: invert(1);
+  opacity: 1;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  background-color: rgba(250, 250, 250, 0.24);
+}
+
 .check-field {
   display: flex;
   align-items: center;
