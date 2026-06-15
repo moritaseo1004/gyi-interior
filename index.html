@@ -90,6 +90,10 @@
               <span>별도 구매</span>
               <strong id="purchaseTotal">0원</strong>
             </div>
+            <div>
+              <span>공제 가능 VAT</span>
+              <strong id="deductibleVatTotal">0원</strong>
+            </div>
           </div>
           <div id="estimateTable" class="estimate-table"></div>
         </section>
@@ -125,6 +129,10 @@
             <div>
               <span>전체 품목</span>
               <strong id="purchaseItemCount">0건</strong>
+            </div>
+            <div>
+              <span>공제 가능 VAT</span>
+              <strong id="purchaseDeductibleVat">0원</strong>
             </div>
           </div>
           <div class="section-heading">
@@ -236,6 +244,16 @@
             <select id="vendorStatus"></select>
           </label>
         </div>
+        <div class="two-col">
+          <label>
+            <span>VAT</span>
+            <select id="vendorVatType"></select>
+          </label>
+          <label class="check-field">
+            <input id="vendorVatDeductible" type="checkbox" />
+            <span>VAT 공제 가능</span>
+          </label>
+        </div>
         <label>
           <span>포함 / 미포함 / 조건</span>
           <textarea id="vendorScope" rows="3" placeholder="자재 포함, 철거 별도, VAT 포함 여부 등"></textarea>
@@ -274,6 +292,16 @@
           <label>
             <span>상태</span>
             <select id="purchaseStatus"></select>
+          </label>
+        </div>
+        <div class="two-col">
+          <label>
+            <span>VAT</span>
+            <select id="purchaseVatType"></select>
+          </label>
+          <label class="check-field">
+            <input id="purchaseVatDeductible" type="checkbox" />
+            <span>VAT 공제 가능</span>
           </label>
         </div>
         <div class="two-col">

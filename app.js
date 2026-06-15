@@ -27,6 +27,7 @@ const VENDOR_STATUSES = [
 ];
 
 const PURCHASE_STATUSES = ["구매 예정", "비교 중", "주문 완료", "배송 중", "구매 완료", "보류"];
+const VAT_TYPES = ["VAT 포함", "VAT 별도", "VAT 없음"];
 
 const PROCESS_TEMPLATES = [
   {
@@ -186,6 +187,7 @@ const els = {
   unselectedCount: document.querySelector("#unselectedCount"),
   totalProcessCount: document.querySelector("#totalProcessCount"),
   purchaseTotal: document.querySelector("#purchaseTotal"),
+  deductibleVatTotal: document.querySelector("#deductibleVatTotal"),
   estimateTable: document.querySelector("#estimateTable"),
   scheduleSummary: document.querySelector("#scheduleSummary"),
   scheduleList: document.querySelector("#scheduleList"),
@@ -193,6 +195,7 @@ const els = {
   purchasePlannedCount: document.querySelector("#purchasePlannedCount"),
   purchaseDoneCount: document.querySelector("#purchaseDoneCount"),
   purchaseItemCount: document.querySelector("#purchaseItemCount"),
+  purchaseDeductibleVat: document.querySelector("#purchaseDeductibleVat"),
   purchaseList: document.querySelector("#purchaseList"),
   addPurchaseBtn: document.querySelector("#addPurchaseBtn"),
   vendorGrid: document.querySelector("#vendorGrid"),
@@ -211,6 +214,8 @@ const els = {
   vendorContact: document.querySelector("#vendorContact"),
   vendorQuote: document.querySelector("#vendorQuote"),
   vendorStatus: document.querySelector("#vendorStatus"),
+  vendorVatType: document.querySelector("#vendorVatType"),
+  vendorVatDeductible: document.querySelector("#vendorVatDeductible"),
   vendorScope: document.querySelector("#vendorScope"),
   vendorMemo: document.querySelector("#vendorMemo"),
   deleteVendorBtn: document.querySelector("#deleteVendorBtn"),
@@ -222,6 +227,8 @@ const els = {
   purchaseCategory: document.querySelector("#purchaseCategory"),
   purchaseStatus: document.querySelector("#purchaseStatus"),
   purchasePrice: document.querySelector("#purchasePrice"),
+  purchaseVatType: document.querySelector("#purchaseVatType"),
+  purchaseVatDeductible: document.querySelector("#purchaseVatDeductible"),
   purchaseStore: document.querySelector("#purchaseStore"),
   purchaseMemo: document.querySelector("#purchaseMemo"),
   deletePurchaseBtn: document.querySelector("#deletePurchaseBtn"),
@@ -351,6 +358,8 @@ async function boot() {
   fillSelect(els.processStatus, PROCESS_STATUSES);
   fillSelect(els.vendorStatus, VENDOR_STATUSES);
   fillSelect(els.purchaseStatus, PURCHASE_STATUSES);
+  fillSelect(els.vendorVatType, VAT_TYPES);
+  fillSelect(els.purchaseVatType, VAT_TYPES);
   wireEvents();
 
   if (!isRemoteEnabled()) {
@@ -388,6 +397,37 @@ function money(value) {
   const number = Number(value || 0);
   if (!number) return "금액 미입력";
   return new Intl.NumberFormat("ko-KR").format(number) + "원";
+}
+
+function numericMoney(value) {
+  return new Intl.NumberFormat("ko-KR").format(Number(value || 0)) + "원";
+}
+
+function vatTypeOf(item) {
+  return item?.vatType || "VAT 포함";
+}
+
+function vatAmount(item, amountKey) {
+  const amount = Number(item?.[amountKey] || 0);
+  if (!amount || vatTypeOf(item) === "VAT 없음") return 0;
+  if (vatTypeOf(item) === "VAT 별도") return Math.round(amount * 0.1);
+  return Math.round(amount / 11);
+}
+
+function totalWithVat(item, amountKey) {
+  const amount = Number(item?.[amountKey] || 0);
+  if (!amount) return 0;
+  return vatTypeOf(item) === "VAT 별도" ? amount + vatAmount(item, amountKey) : amount;
+}
+
+function deductibleVat(item, amountKey) {
+  return item?.vatDeductible ? vatAmount(item, amountKey) : 0;
+}
+
+function vatLabel(item, amountKey) {
+  const parts = [vatTypeOf(item)];
+  if (item?.vatDeductible) parts.push(`공제 ${numericMoney(vatAmount(item, amountKey))}`);
+  return parts.join(" · ");
 }
 
 function formatDate(value) {
@@ -505,13 +545,22 @@ function renderDashboard() {
     return { process, vendor, index };
   });
   const selectedRows = rows.filter((row) => row.vendor);
-  const total = selectedRows.reduce((sum, row) => sum + Number(row.vendor.quote || 0), 0);
+  const total = selectedRows.reduce((sum, row) => sum + totalWithVat(row.vendor, "quote"), 0);
+  const vendorDeductibleVat = selectedRows.reduce(
+    (sum, row) => sum + deductibleVat(row.vendor, "quote"),
+    0,
+  );
+  const purchaseDeductibleVat = (state.purchases || []).reduce(
+    (sum, item) => sum + deductibleVat(item, "price"),
+    0,
+  );
 
-  els.totalEstimate.textContent = money(total);
+  els.totalEstimate.textContent = numericMoney(total);
   els.selectedCount.textContent = `${selectedRows.length}건`;
   els.unselectedCount.textContent = `${state.processes.length - selectedRows.length}건`;
   els.totalProcessCount.textContent = `${state.processes.length}건`;
-  els.purchaseTotal.textContent = money(purchaseTotal());
+  els.purchaseTotal.textContent = numericMoney(purchaseTotal());
+  els.deductibleVatTotal.textContent = numericMoney(vendorDeductibleVat + purchaseDeductibleVat);
 
   els.estimateTable.innerHTML = `
     <div class="estimate-header" aria-hidden="true">
@@ -531,7 +580,10 @@ function renderDashboard() {
           </span>
           <span class="estimate-vendor">${escapeHtml(vendor?.name || "업체 미선정")}</span>
           <span class="estimate-date">${escapeHtml(dateRange(process))}</span>
-          <strong class="estimate-amount">${escapeHtml(hasVendor ? money(vendor.quote) : "-")}</strong>
+          <strong class="estimate-amount">
+            <span>${escapeHtml(hasVendor ? numericMoney(totalWithVat(vendor, "quote")) : "-")}</span>
+            <small>${escapeHtml(hasVendor ? vatLabel(vendor, "quote") : "VAT 미정")}</small>
+          </strong>
         </button>
       `;
     })
@@ -540,7 +592,7 @@ function renderDashboard() {
 }
 
 function purchaseTotal() {
-  return (state.purchases || []).reduce((sum, item) => sum + Number(item.price || 0), 0);
+  return (state.purchases || []).reduce((sum, item) => sum + totalWithVat(item, "price"), 0);
 }
 
 function renderPurchases() {
@@ -548,10 +600,13 @@ function renderPurchases() {
   const plannedCount = purchases.filter((item) => item.status !== "구매 완료").length;
   const doneCount = purchases.filter((item) => item.status === "구매 완료").length;
 
-  els.purchaseViewTotal.textContent = money(purchaseTotal());
+  const purchaseDeductibleVat = purchases.reduce((sum, item) => sum + deductibleVat(item, "price"), 0);
+
+  els.purchaseViewTotal.textContent = numericMoney(purchaseTotal());
   els.purchasePlannedCount.textContent = `${plannedCount}건`;
   els.purchaseDoneCount.textContent = `${doneCount}건`;
   els.purchaseItemCount.textContent = `${purchases.length}건`;
+  els.purchaseDeductibleVat.textContent = numericMoney(purchaseDeductibleVat);
 
   if (!purchases.length) {
     els.purchaseList.innerHTML = `
@@ -576,7 +631,8 @@ function renderPurchases() {
             </div>
             <span class="pill">${escapeHtml(item.status || "구매 예정")}</span>
           </header>
-          <strong>${escapeHtml(money(item.price))}</strong>
+          <strong>${escapeHtml(numericMoney(totalWithVat(item, "price")))}</strong>
+          <p>${escapeHtml(vatLabel(item, "price"))}</p>
           <p>${escapeHtml(item.store || "구매처 미입력")}</p>
           <p>${escapeHtml(item.memo || "메모가 비어 있어요.")}</p>
           <button class="secondary-button" type="button" data-edit-purchase="${item.id}">수정</button>
@@ -750,7 +806,9 @@ function renderVendors(process) {
     return;
   }
 
-  const sorted = [...process.vendors].sort((a, b) => Number(a.quote || 0) - Number(b.quote || 0));
+  const sorted = [...process.vendors].sort(
+    (a, b) => totalWithVat(a, "quote") - totalWithVat(b, "quote"),
+  );
   els.vendorGrid.innerHTML = sorted
     .map(
       (vendor) => `
@@ -762,7 +820,8 @@ function renderVendors(process) {
             </div>
             <span class="pill">${escapeHtml(vendor.status)}</span>
           </header>
-          <div class="quote">${escapeHtml(money(vendor.quote))}</div>
+          <div class="quote">${escapeHtml(numericMoney(totalWithVat(vendor, "quote")))}</div>
+          <p>${escapeHtml(vatLabel(vendor, "quote"))}</p>
           <p>${escapeHtml(vendor.scope || "포함/미포함 조건을 적어두세요.")}</p>
           <p>${escapeHtml(vendor.memo || "장단점 메모가 비어 있어요.")}</p>
           <div class="card-actions">
@@ -807,6 +866,8 @@ function openVendorDialog(vendor = null) {
   els.vendorContact.value = vendor?.contact || "";
   els.vendorQuote.value = vendor?.quote || "";
   els.vendorStatus.value = vendor?.status || "후보";
+  els.vendorVatType.value = vendor?.vatType || "VAT 포함";
+  els.vendorVatDeductible.checked = Boolean(vendor?.vatDeductible);
   els.vendorScope.value = vendor?.scope || "";
   els.vendorMemo.value = vendor?.memo || "";
   els.deleteVendorBtn.style.display = vendor ? "inline-flex" : "none";
@@ -820,6 +881,8 @@ function openPurchaseDialog(item = null) {
   els.purchaseCategory.value = item?.category || "";
   els.purchaseStatus.value = item?.status || "구매 예정";
   els.purchasePrice.value = item?.price || "";
+  els.purchaseVatType.value = item?.vatType || "VAT 포함";
+  els.purchaseVatDeductible.checked = Boolean(item?.vatDeductible);
   els.purchaseStore.value = item?.store || "";
   els.purchaseMemo.value = item?.memo || "";
   els.deletePurchaseBtn.style.display = item ? "inline-flex" : "none";
@@ -909,6 +972,8 @@ function wireEvents() {
       category: els.purchaseCategory.value.trim(),
       status: els.purchaseStatus.value,
       price: Number(els.purchasePrice.value || 0),
+      vatType: els.purchaseVatType.value,
+      vatDeductible: els.purchaseVatDeductible.checked,
       store: els.purchaseStore.value.trim(),
       memo: els.purchaseMemo.value.trim(),
     };
@@ -1006,6 +1071,8 @@ function wireEvents() {
       contact: els.vendorContact.value.trim(),
       quote: Number(els.vendorQuote.value || 0),
       status: els.vendorStatus.value,
+      vatType: els.vendorVatType.value,
+      vatDeductible: els.vendorVatDeductible.checked,
       scope: els.vendorScope.value.trim(),
       memo: els.vendorMemo.value.trim(),
     };

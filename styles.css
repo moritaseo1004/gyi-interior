@@ -655,11 +655,25 @@ button:focus-visible {
 }
 
 .estimate-amount {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
   overflow: hidden;
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+.estimate-amount span,
+.estimate-amount small {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.estimate-amount small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .status-strip {
@@ -697,6 +711,26 @@ textarea {
   color: var(--text);
   background: var(--surface-strong);
   outline: none;
+}
+
+.check-field {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.check-field input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  accent-color: var(--primary-dark);
 }
 
 textarea {
@@ -1220,6 +1254,10 @@ dialog::backdrop {
   .estimate-amount {
     padding-left: 36px;
     text-align: left;
+  }
+
+  .estimate-amount span,
+  .estimate-amount small {
     white-space: normal;
   }
 
