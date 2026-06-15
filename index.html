@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>반셀프 인테리어 트래커</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen" hidden>
+      <form id="loginForm" class="login-card">
+        <div class="brand">
+          <div class="brand-mark">I</div>
+          <div>
+            <h1>인테리어 트래커</h1>
+            <p>로그인 후 공정 데이터를 불러옵니다</p>
+          </div>
+        </div>
+        <label>
+          <span>아이디</span>
+          <input id="loginEmail" autocomplete="username" required type="email" placeholder="admin@example.com" />
+        </label>
+        <label>
+          <span>비밀번호</span>
+          <input id="loginPassword" autocomplete="current-password" required type="password" />
+        </label>
+        <p id="loginError" class="login-error" role="alert"></p>
+        <button class="primary-button" type="submit">로그인</button>
+      </form>
+    </section>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">I</div>
+          <div>
+            <h1>인테리어 트래커</h1>
+            <p>공정, 견적, 결정을 한곳에서</p>
+          </div>
+        </div>
+
+        <div class="summary-panel">
+          <span class="eyebrow">전체 현황</span>
+          <strong id="summaryText">준비 중</strong>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </div>
+
+        <div class="nav-scroll">
+          <button id="dashboardBtn" class="dashboard-nav active" data-label="전체" type="button">대시보드</button>
+          <button id="scheduleBtn" class="dashboard-nav" data-label="일정" type="button">일정</button>
+          <nav id="processList" class="process-list" aria-label="공정 목록"></nav>
+        </div>
+
+        <button id="addProcessBtn" class="ghost-button" type="button">+ 공정 추가</button>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">오늘 정리할 것</p>
+            <h2 id="activeProcessTitle">공정</h2>
+          </div>
+        </header>
+
+        <section id="dashboardView" class="view-screen dashboard-panel" aria-label="전체 대시보드">
+          <div class="dashboard-hero">
+            <div>
+              <p class="eyebrow">전체 대시보드</p>
+              <h3>선정 업체 총 견적</h3>
+            </div>
+            <strong id="totalEstimate">0원</strong>
+          </div>
+          <div class="dashboard-stats">
+            <div>
+              <span>선정 완료</span>
+              <strong id="selectedCount">0건</strong>
+            </div>
+            <div>
+              <span>미선정 공정</span>
+              <strong id="unselectedCount">0건</strong>
+            </div>
+            <div>
+              <span>전체 공정</span>
+              <strong id="totalProcessCount">0건</strong>
+            </div>
+          </div>
+          <div id="estimateTable" class="estimate-table"></div>
+        </section>
+
+        <section id="scheduleView" class="view-screen schedule-panel" aria-label="전체 일정" hidden>
+          <div class="dashboard-hero">
+            <div>
+              <p class="eyebrow">전체 일정</p>
+              <h3>공정 캘린더</h3>
+            </div>
+            <strong id="scheduleSummary">일정 미정</strong>
+          </div>
+          <div id="scheduleList" class="schedule-list"></div>
+        </section>
+
+        <div id="processView" class="view-screen" hidden>
+          <section class="status-strip" aria-label="공정 상태">
+            <label>
+              <span>상태</span>
+              <select id="processStatus"></select>
+            </label>
+            <label>
+              <span>시작일자</span>
+              <input id="processStartDate" type="date" />
+            </label>
+            <label>
+              <span>종료일자</span>
+              <input id="processEndDate" type="date" />
+            </label>
+            <label class="wide-field">
+              <span>이번 공정에서 꼭 확인할 것</span>
+              <input id="processFocus" type="text" placeholder="예: 철거 범위, 폐기물 포함 여부" />
+            </label>
+          </section>
+
+          <section class="grid-layout">
+            <div class="panel panel-main">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">업체 후보</p>
+                  <h3>견적 비교</h3>
+                </div>
+                <button id="addVendorBtn" class="primary-button" type="button">+ 업체 추가</button>
+              </div>
+              <div id="vendorGrid" class="vendor-grid"></div>
+            </div>
+
+            <div class="panel">
+              <div class="section-heading compact">
+                <div>
+                  <p class="eyebrow">결정 노트</p>
+                  <h3>부부 논의</h3>
+                </div>
+              </div>
+              <div class="note-stack">
+                <label>
+                  <span>내 의견</span>
+                  <textarea id="myNote" rows="4" placeholder="나는 이 업체가 좋은 이유..."></textarea>
+                </label>
+                <label>
+                  <span>아내 의견</span>
+                  <textarea id="partnerNote" rows="4" placeholder="와이프가 중요하게 보는 점..."></textarea>
+                </label>
+                <label>
+                  <span>결정된 내용</span>
+                  <textarea id="decisionNote" rows="4" placeholder="최종 선택, 보류 사유, 다음 액션"></textarea>
+                </label>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="section-heading compact">
+                <div>
+                  <p class="eyebrow">체크리스트</p>
+                  <h3>빠뜨리면 아픈 것들</h3>
+                </div>
+                <button id="addTaskBtn" class="icon-button" type="button" title="체크 항목 추가">+</button>
+              </div>
+              <div id="taskList" class="task-list"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <dialog id="vendorDialog">
+      <form id="vendorForm" method="dialog" class="dialog-card">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">업체 정보</p>
+            <h3 id="vendorDialogTitle">업체 추가</h3>
+          </div>
+          <button class="icon-button" value="cancel" type="submit" title="닫기">×</button>
+        </div>
+
+        <input id="vendorId" type="hidden" />
+        <label>
+          <span>업체명</span>
+          <input id="vendorName" required type="text" placeholder="예: 우리집 도배" />
+        </label>
+        <label>
+          <span>연락처 / 링크</span>
+          <input id="vendorContact" type="text" placeholder="전화번호, 카톡, 숨고 링크 등" />
+        </label>
+        <div class="two-col">
+          <label>
+            <span>견적 금액</span>
+            <input id="vendorQuote" min="0" step="10000" type="number" placeholder="0" />
+          </label>
+          <label>
+            <span>상태</span>
+            <select id="vendorStatus"></select>
+          </label>
+        </div>
+        <label>
+          <span>포함 / 미포함 / 조건</span>
+          <textarea id="vendorScope" rows="3" placeholder="자재 포함, 철거 별도, VAT 포함 여부 등"></textarea>
+        </label>
+        <label>
+          <span>장단점 메모</span>
+          <textarea id="vendorMemo" rows="4" placeholder="응답 빠름, 일정 가능, 가격 높음 등"></textarea>
+        </label>
+        <div class="dialog-actions">
+          <button id="deleteVendorBtn" class="danger-button" type="button">삭제</button>
+          <button class="primary-button" value="default" type="submit">저장</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
