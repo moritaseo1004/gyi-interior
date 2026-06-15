@@ -498,6 +498,7 @@ function vatAmount(item, amountKey) {
 function totalWithVat(item, amountKey) {
   const amount = Number(item?.[amountKey] || 0);
   if (!amount) return 0;
+  if (amountKey === "quote") return amount;
   return vatTypeOf(item) === "VAT 별도" ? amount + vatAmount(item, amountKey) : amount;
 }
 
