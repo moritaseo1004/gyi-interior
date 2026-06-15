@@ -668,11 +668,28 @@ button:focus-visible {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+}
+
+.purchase-card header > div {
+  min-width: 0;
 }
 
 .purchase-card h4 {
   margin: 0 0 4px;
   font-size: 16px;
+}
+
+.purchase-card h4,
+.purchase-card p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.purchase-card h4,
+.purchase-card header p {
+  white-space: nowrap;
 }
 
 .purchase-card p {
@@ -684,6 +701,29 @@ button:focus-visible {
 
 .purchase-card strong {
   font-size: 20px;
+}
+
+.purchase-link {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-link:hover {
+  border-color: #3f3f46;
+  background: #18181b;
 }
 
 .linked-processes {

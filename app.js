@@ -568,6 +568,21 @@ function renderAttachmentLinks(quote) {
   `;
 }
 
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+function purchaseStoreMarkup(store) {
+  const value = String(store || "").trim();
+  if (!value) return `<p>구매처 미입력</p>`;
+  if (!isHttpUrl(value)) return `<p>${escapeHtml(value)}</p>`;
+  return `
+    <a class="purchase-link" href="${escapeHtml(value)}" target="_blank" rel="noreferrer" title="${escapeHtml(value)}">
+      ${escapeHtml(value)}
+    </a>
+  `;
+}
+
 function viewButton(label, target, extra = "") {
   return `<button class="mini-action" type="button" data-dashboard-view="${target}">${escapeHtml(label)}${extra ? `<small>${escapeHtml(extra)}</small>` : ""}</button>`;
 }
@@ -867,7 +882,7 @@ function renderPurchases() {
           </header>
           <strong>${escapeHtml(numericMoney(totalWithVat(item, "price")))}</strong>
           <p>${escapeHtml(vatLabel(item, "price"))}</p>
-          <p>${escapeHtml(item.store || "구매처 미입력")}</p>
+          ${purchaseStoreMarkup(item.store)}
           <p>${escapeHtml(item.memo || "메모가 비어 있어요.")}</p>
           <button class="secondary-button" type="button" data-edit-purchase="${item.id}">수정</button>
         </article>
